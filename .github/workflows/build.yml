@@ -1,0 +1,82 @@
+---
+name: ripgrep
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        required: true
+        description: version to build (without "v")
+        default: 13.0.0
+        type: string
+
+permissions: write-all
+
+jobs:
+  cargo-build:
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - x86_64-unknown-linux-gnu
+          - aarch64-unknown-linux-gnu
+          # - aarch64-unknown-linux-musl  # this fails
+          - aarch64-apple-darwin
+
+    name: Build ${{matrix.target}}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@main
+      - name: Checkout src
+        uses: actions/checkout@main
+        with:
+          repository: BurntSushi/ripgrep
+          ref: ${{inputs.version}}
+          path: src
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@master
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@master
+      - name: Build ${{matrix.target}}
+        run: |
+          docker run --rm --volume ./src:/root/src --workdir /root/src joseluisq/rust-linux-darwin-builder:latest sh -c "cargo build --verbose --release --target ${{matrix.target}}"
+      - name: Upload ${{matrix.target}}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cp src/target/${{matrix.target}}/release/rg .
+          tar -czf "ripgrep-${{inputs.version}}-${{matrix.target}}.tar.gz" rg
+          # create release if not exist
+          gh release create "${{inputs.version}}" --notes "Release ripgrep ${{inputs.version}}" --title "${{inputs.version}}" --repo "${{github.repository}}" || true
+          # delete the asset if exists
+          gh release delete-asset "${{inputs.version}}" "ripgrep-${{inputs.version}}-${{matrix.target}}.tar.gz" --yes --repo "${{github.repository}}" || true
+          gh release upload "${{inputs.version}}" "./ripgrep-${{inputs.version}}-${{matrix.target}}.tar.gz" --repo "${{github.repository}}"
+
+  upload-official:
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - x86_64-unknown-linux-musl
+          - x86_64-apple-darwin
+          - arm-unknown-linux-gnueabihf
+    name: upload official ${{matrix.target}}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@main
+      - name: upload ${{matrix.target}}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p /tmp/${{matrix.target}}
+          wget -O /tmp/${{matrix.target}}/${{matrix.target}}.tar.gz https://github.com/BurntSushi/ripgrep/releases/download/${{inputs.version}}/ripgrep-${{inputs.version}}-${{matrix.target}}.tar.gz
+          tar --strip-components 1 -C /tmp/${{matrix.target}} -xvzf /tmp/${{matrix.target}}/${{matrix.target}}.tar.gz
+          cp /tmp/${{matrix.target}}/rg .
+          tar -czf "ripgrep-${{inputs.version}}-${{matrix.target}}.tar.gz" rg
+          # create release if not exist
+          gh release create "${{inputs.version}}" --notes "Release ripgrep ${{inputs.version}}" --title "${{inputs.version}}" --repo "${{github.repository}}" || true
+          # delete the asset if exists
+          gh release delete-asset "${{inputs.version}}" "ripgrep-${{inputs.version}}-${{matrix.target}}.tar.gz" --yes --repo "${{github.repository}}" || true
+          gh release upload "${{inputs.version}}" "./ripgrep-${{inputs.version}}-${{matrix.target}}.tar.gz" --repo "${{github.repository}}"
