@@ -1,5 +1,6 @@
 ---
 name: ripgrep
+run-name: ripgrep-${{inputs.version}}
 
 on:
   workflow_dispatch:
@@ -46,6 +47,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cp src/target/${{matrix.target}}/release/rg .
+          if [[ "${{matrix.target}}" != *darwin* ]]; then
+          upx --best --ultra-brute rg || true
+          fi
           tar -czf "ripgrep-${{inputs.version}}-${{matrix.target}}.tar.gz" rg
           # create release if not exist
           gh release create "${{inputs.version}}" --notes "Release ripgrep ${{inputs.version}}" --title "${{inputs.version}}" --repo "${{github.repository}}" || true
@@ -74,6 +78,9 @@ jobs:
           wget -O /tmp/${{matrix.target}}/${{matrix.target}}.tar.gz https://github.com/BurntSushi/ripgrep/releases/download/${{inputs.version}}/ripgrep-${{inputs.version}}-${{matrix.target}}.tar.gz
           tar --strip-components 1 -C /tmp/${{matrix.target}} -xvzf /tmp/${{matrix.target}}/${{matrix.target}}.tar.gz
           cp /tmp/${{matrix.target}}/rg .
+          if [[ "${{matrix.target}}" != *darwin* ]]; then
+          upx --best --ultra-brute rg || true
+          fi
           tar -czf "ripgrep-${{inputs.version}}-${{matrix.target}}.tar.gz" rg
           # create release if not exist
           gh release create "${{inputs.version}}" --notes "Release ripgrep ${{inputs.version}}" --title "${{inputs.version}}" --repo "${{github.repository}}" || true
