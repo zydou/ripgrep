@@ -42,13 +42,17 @@ jobs:
       - name: Build ${{matrix.target}}
         run: |
           docker run --rm --volume ./src:/root/src --workdir /root/src joseluisq/rust-linux-darwin-builder:latest sh -c "cargo build --verbose --release --target ${{matrix.target}}"
+      - name: Install latest upx
+        run: |
+          eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+          brew install upx
       - name: Upload ${{matrix.target}}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cp src/target/${{matrix.target}}/release/rg .
           if [[ "${{matrix.target}}" != *darwin* ]]; then
-          upx --best --ultra-brute rg || true
+          /home/linuxbrew/.linuxbrew/bin/upx --best --ultra-brute rg || true
           fi
           tar -czf "ripgrep-${{inputs.version}}-${{matrix.target}}.tar.gz" rg
           # create release if not exist
@@ -70,6 +74,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@main
+      - name: Install latest upx
+        run: |
+          eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+          brew install upx
       - name: upload ${{matrix.target}}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -79,7 +87,7 @@ jobs:
           tar --strip-components 1 -C /tmp/${{matrix.target}} -xvzf /tmp/${{matrix.target}}/${{matrix.target}}.tar.gz
           cp /tmp/${{matrix.target}}/rg .
           if [[ "${{matrix.target}}" != *darwin* ]]; then
-          upx --best --ultra-brute rg || true
+          /home/linuxbrew/.linuxbrew/bin/upx --best --ultra-brute rg || true
           fi
           tar -czf "ripgrep-${{inputs.version}}-${{matrix.target}}.tar.gz" rg
           # create release if not exist
